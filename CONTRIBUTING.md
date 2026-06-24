@@ -1,12 +1,12 @@
-# Contribuindo
+# Contributing
 
-## Ambiente
+## Environment
 
-1. Instale Go e as dependências nativas do Fyne.
-2. Execute `go mod download`.
-3. Opcionalmente configure o ambiente Python descrito no README para testes manuais de TTS.
+1. Install Go and Fyne's native dependencies.
+2. Run `go mod download`.
+3. Optionally configure the Python environment described in the README for manual TTS tests.
 
-## Antes de enviar mudanças
+## Before Sending Changes
 
 ```bash
 gofmt -w .
@@ -14,18 +14,18 @@ go test ./...
 go vet ./...
 ```
 
-Em runner headless:
+On a headless runner:
 
 ```bash
 go test -tags ci ./...
 ```
 
-## Diretrizes
+## Guidelines
 
-- preserve as fronteiras entre UI, domínio, pipeline e adaptadores;
-- não bloqueie a thread Fyne com extração, rede ou TTS;
-- use interfaces pequenas nas integrações pesadas;
-- escreva arquivos finais de forma atômica;
-- mantenha falhas do LLM como fail-open;
-- inclua teste de regressão para mudanças em heurísticas de limpeza ou layout;
-- não acrescente chamadas de telemetria.
+- preserve the boundaries between UI, domain, pipeline, and adapters;
+- do not block the Fyne thread with extraction, network, or TTS work;
+- use small interfaces for heavy integrations;
+- write final files atomically;
+- keep LLM failures fail-open;
+- include regression tests for changes in cleaning or layout heuristics;
+- do not add telemetry calls.

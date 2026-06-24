@@ -142,7 +142,7 @@ func (d *Desktop) buildNewJobView() fyne.CanvasObject {
 	chooseFile := widget.NewButtonWithIcon("Choose PDF", theme.FolderOpenIcon(), d.choosePDF)
 	fileRow := container.NewBorder(nil, nil, chooseFile, nil, container.NewPadded(d.fileLabel))
 
-	d.language = widget.NewSelect([]string{"Auto-detect", "English", "Português (Brasil)"}, nil)
+	d.language = widget.NewSelect([]string{"Auto-detect", "English", "Brazilian Portuguese"}, nil)
 	d.language.SetSelected("Auto-detect")
 	d.engine = widget.NewSelect([]string{"Piper — Fast", "Kokoro — Quality"}, func(_ string) {
 		d.refreshVoiceOptions()
@@ -653,7 +653,7 @@ func selectedLanguage(display string) string {
 	switch display {
 	case "English":
 		return "en"
-	case "Português (Brasil)":
+	case "Brazilian Portuguese":
 		return "pt-BR"
 	default:
 		return "auto"

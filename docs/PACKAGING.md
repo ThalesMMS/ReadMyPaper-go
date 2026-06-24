@@ -1,35 +1,35 @@
-# Plano de Empacotamento Autocontido — ReadMyPaper-go
+# Self-Contained Packaging Plan — ReadMyPaper-go
 
-## Objetivo
+## Goal
 
-Disponibilizar o `ReadMyPaper-go` como um aplicativo `.app` para macOS que abre com dois cliques e não depende de Python, variáveis de ambiente ou terminal. O bundle deve conter o binário Go, a interface Fyne, o runtime Python e os pacotes necessários para os backends de TTS (Piper e Kokoro).
+Ship `ReadMyPaper-go` as a macOS `.app` that opens with a double click and does not depend on Python, environment variables, or a terminal. The bundle must contain the Go binary, the Fyne interface, the Python runtime, and the packages required by the TTS backends (Piper and Kokoro).
 
-## Estado atual
+## Current State
 
-- O núcleo do aplicativo é Go/Fyne.
-- Os scripts Python dos backends TTS são embutidos no binário via `go:embed` e extraídos em cache no primeiro uso.
-- Em runtime, o app executa esses scripts usando um interpretador Python externo configurado por `READMYPAPER_PYTHON_BIN`.
-- O ambiente virtual deve ser criado manualmente e ativado antes de rodar o app.
-- O arquivo `requirements-tts.txt` lista as dependências Python.
-- O target `fyne package` existe no `Makefile`, mas gera apenas o binário Go com metadados; não leva o Python embarcado.
+- The app core is Go/Fyne.
+- The Python scripts for the TTS backends are embedded in the binary through `go:embed` and extracted to cache on first use.
+- At runtime, the app runs those scripts with an external Python interpreter configured by `READMYPAPER_PYTHON_BIN`.
+- The virtual environment must be created manually and activated before running the app.
+- `requirements-tts.txt` lists the Python dependencies.
+- The `fyne package` target exists in the `Makefile`, but it generates only the Go binary with metadata; it does not include embedded Python.
 
-## Decisões de arquitetura
+## Architecture Decisions
 
-### 1. Python relocável
+### 1. Relocatable Python
 
-Usar como base o **Python standalone** do projeto `astral-sh/python-build-standalone` (continuação do `indygreg/python-build-standalone`). Essa distribuição já é compilada para ser relocável no macOS e funciona quando copiada para dentro de um `.app`.
+Use **Python standalone** from `astral-sh/python-build-standalone` (continuation of `indygreg/python-build-standalone`) as the base. This distribution is already compiled to be relocatable on macOS and works when copied inside a `.app`.
 
-Pacotes a instalar no Python embarcado:
+Packages to install in the bundled Python:
 
 - `piper-tts`
-- `kokoro-onnx` (ou equivalente usado no projeto)
-- quaisquer outras dependências listadas em `requirements-tts.txt`
+- `kokoro-onnx` (or the equivalent used by the project)
+- any other dependencies listed in `requirements-tts.txt`
 
-A instalação deve ser feita diretamente no Python relocável, sem criar `venv` interno, para reduzir complexidade e caminhos absolutos.
+Install directly into the relocatable Python, without creating an internal `venv`, to reduce complexity and absolute paths.
 
-O script `scripts/package-macos.sh` usa CPython 3.12 por padrão e permite trocar a origem com `PYTHON_STANDALONE_REPO`, `PYTHON_VERSION_PREFIX` ou URLs explícitas por arquitetura.
+The `scripts/package-macos.sh` script uses CPython 3.12 by default and allows the source to be changed with `PYTHON_STANDALONE_REPO`, `PYTHON_VERSION_PREFIX`, or explicit architecture-specific URLs.
 
-### 2. Estrutura do `.app`
+### 2. `.app` Structure
 
 ```text
 ReadMyPaper.app/
@@ -47,107 +47,107 @@ ReadMyPaper.app/
 │               └── ...
 ```
 
-### 3. Descoberta de recursos em runtime
+### 3. Runtime Resource Discovery
 
-Adicionar uma função Go que, a partir de `os.Executable()`, detecta se o binário está dentro de um `.app` e resolve o caminho relativo para `Contents/Resources/python/bin/python3`.
+Add a Go helper that starts from `os.Executable()`, detects whether the binary is inside a `.app`, and resolves the relative path to `Contents/Resources/python/bin/python3`.
 
-A ordem de resolução do interpretador deve ser:
+Interpreter resolution order:
 
-1. `READMYPAPER_PYTHON_BIN` se estiver definida (modo desenvolvimento).
-2. Python bundled em `Contents/Resources/python/bin/python3`.
-3. Python bundled específico da arquitetura em `Contents/Resources/python-arm64/bin/python3` ou `Contents/Resources/python-x86_64/bin/python3`, usado pelo pacote universal.
-4. `python3` do `PATH` (fallback para máquinas de desenvolvimento).
+1. `READMYPAPER_PYTHON_BIN` when defined (development mode).
+2. Bundled Python at `Contents/Resources/python/bin/python3`.
+3. Architecture-specific bundled Python at `Contents/Resources/python-arm64/bin/python3` or `Contents/Resources/python-x86_64/bin/python3`, used by the universal package.
+4. `python3` from `PATH` (fallback for development machines).
 
-### 4. Cache de vozes e modelos
+### 4. Voice And Model Cache
 
-Vozes e modelos TTS continuarão sendo baixados na primeira execução e armazenados em `~/Library/Caches/ReadMyPaper`. Isso mantém o bundle menor e permite atualizar modelos sem rebuild.
+TTS voices and models continue to be downloaded on first run and stored in `~/Library/Caches/ReadMyPaper`. This keeps the bundle smaller and allows models to be updated without rebuilding.
 
-## Mudanças necessárias
+## Required Changes
 
-### Código Go
+### Go Code
 
 - `internal/config/config.go`
-  - Adicionar função auxiliar para resolver caminho do Python embarcado.
-  - Preservar leitura de `READMYPAPER_PYTHON_BIN`.
+  - Add a helper to resolve the bundled Python path.
+  - Preserve `READMYPAPER_PYTHON_BIN` handling.
 
 - `internal/tts/tts.go`
-  - Ajustar detecção do interpretador para usar a função de resolução.
+  - Adjust interpreter detection to use the resolver.
 
-- `internal/tts/piper.go` e `internal/tts/kokoro.go`
-  - Garantir que os bridges Python materializados em cache sejam executados com o Python embarcado.
+- `internal/tts/piper.go` and `internal/tts/kokoro.go`
+  - Ensure the materialized Python bridges run with the bundled Python.
 
-### Build e scripts
+### Build And Scripts
 
-- Criar `scripts/package-macos.sh`.
-  - Baixar Python standalone para a arquitetura alvo (arm64, x86_64 ou universal).
-  - Instalar dependências de `requirements-tts.txt`.
-  - Compilar `cmd/readmypaper` com `go build`.
-  - Montar a estrutura do `.app`.
-  - Gerar `Info.plist`.
-  - Copiar ícone de `assets/Icon.png`.
-  - Opcional: assinar com `codesign` e notarizar com `notarytool` (se houver certificado de desenvolvedor).
+- Create `scripts/package-macos.sh`.
+  - Download Python standalone for the target architecture (arm64, x86_64, or universal).
+  - Install dependencies from `requirements-tts.txt`.
+  - Compile `cmd/readmypaper` with `go build`.
+  - Assemble the `.app` structure.
+  - Generate `Info.plist`.
+  - Copy the icon from `assets/Icon.png`.
+  - Optional: sign with `codesign` and notarize with `notarytool` if a developer certificate is available.
 
-- Atualizar `Makefile`.
-  - Adicionar target `package-macos`.
-  - Manter target `package` do Fyne como alternativa leve.
+- Update `Makefile`.
+  - Add the `package-macos` target.
+  - Keep Fyne's `package` target as a lightweight alternative.
 
-## Fases de execução
+## Execution Phases
 
-### Fase 1 — Análise do código
+### Phase 1 — Code Analysis
 
-- Mapear todos os pontos onde `READMYPAPER_PYTHON_BIN` e `python3` são usados.
-- Confirmar quais pacotes Python estão em `requirements-tts.txt`.
-- Verificar se Kokoro exige binários adicionais ou apenas pacotes Python.
+- Map every place where `READMYPAPER_PYTHON_BIN` and `python3` are used.
+- Confirm which Python packages are in `requirements-tts.txt`.
+- Check whether Kokoro requires additional binaries or only Python packages.
 
-### Fase 2 — Protótipo de Python relocável
+### Phase 2 — Relocatable Python Prototype
 
-- Baixar `python-build-standalone` para macOS.
-- Instalar `requirements-tts.txt`.
-- Executar os bridges Python manualmente para validar Piper e Kokoro.
-- Medir tamanho do Python após instalação.
+- Download `python-build-standalone` for macOS.
+- Install `requirements-tts.txt`.
+- Run the Python bridges manually to validate Piper and Kokoro.
+- Measure Python size after installation.
 
-### Fase 3 — Detecção de recursos em Go
+### Phase 3 — Go Resource Detection
 
-- Implementar função de resolução de caminho do Python embarcado.
-- Adicionar testes unitários para os cenários:
-  - dentro do `.app`
-  - fora do `.app`
-  - com variável de ambiente definida
+- Implement the bundled Python path resolver.
+- Add unit tests for these scenarios:
+  - inside the `.app`
+  - outside the `.app`
+  - with the environment variable defined
 
-### Fase 4 — Script de empacotamento
+### Phase 4 — Packaging Script
 
-- Criar `scripts/package-macos.sh`.
-- Suportar arquitetura arm64 e x86_64.
-- Gerar `Info.plist` com bundle ID `io.github.thalesmms.readmypaper` (conforme `FyneApp.toml`).
-- Verificar se o ícone existe em `assets/Icon.png`.
+- Create `scripts/package-macos.sh`.
+- Support arm64 and x86_64 architectures.
+- Generate `Info.plist` with bundle ID `io.github.thalesmms.readmypaper` as defined in `FyneApp.toml`.
+- Verify that the icon exists in `assets/Icon.png`.
 
-### Fase 5 — Testes
+### Phase 5 — Tests
 
-- Executar o `.app` em uma máquina sem Python no `PATH`.
-- Processar o PDF de exemplo.
-- Confirmar que o áudio `reading.wav` é gerado.
-- Testar com Piper e Kokoro.
-- Testar fallback quando a variável `READMYPAPER_PYTHON_BIN` é definida.
+- Run the `.app` on a machine without Python in `PATH`.
+- Process the sample PDF.
+- Confirm that `reading.wav` is generated.
+- Test Piper and Kokoro.
+- Test fallback when `READMYPAPER_PYTHON_BIN` is defined.
 
-### Fase 6 — Documentação
+### Phase 6 — Documentation
 
-- Atualizar `README.md` com instruções de build do `.app`.
-- Registrar tamanho do bundle, tempo de primeira execução e limitações de notarização.
+- Update `README.md` with `.app` build instructions.
+- Record bundle size, first-run time, and notarization limitations.
 
-## Tamanho esperado do bundle
+## Expected Bundle Size
 
-- Build arm64 validado em 2026-06-24: `dist/ReadMyPaper.app` ficou com ~854 MB.
-- O maior custo vem do Kokoro e suas dependências atuais, incluindo Torch, spaCy, Transformers e rodas nativas.
-- Builds apenas com Piper ficariam substancialmente menores, mas não atendem ao objetivo deste pacote autocontido com Piper e Kokoro.
+- Arm64 build validated on 2026-06-24: `dist/ReadMyPaper.app` was about 854 MB.
+- The largest cost comes from Kokoro and its current dependencies, including Torch, spaCy, Transformers, and native wheels.
+- Piper-only builds would be substantially smaller, but they do not satisfy the goal of this self-contained package with both Piper and Kokoro.
 
-## Riscos e limitações
+## Risks And Limitations
 
-- **Notarização**: sem Apple Developer ID, o usuário precisa autorizar o app em `Segurança e Privacidade`.
-- **Primeira execução**: ainda pode ser lenta devido ao download de vozes e modelos.
-- **Tamanho**: Kokoro e modelos aumentam significativamente o bundle se incluídos.
-- **Atualizações**: mudanças nos pacotes Python exigem novo build.
+- **Notarization**: without an Apple Developer ID, the user needs to authorize the app in **Security & Privacy**.
+- **First run**: it can still be slow because voices and models must be downloaded.
+- **Size**: Kokoro and its models significantly increase the bundle when included.
+- **Updates**: changes in Python packages require a new build.
 
-## Próximos passos recomendados
+## Recommended Next Steps
 
-1. Iniciar pela Fase 2 (protótipo de Python relocável).
-2. Depois de validado, aplicar a Fase 3 (detecção em Go) e Fase 4 (script de empacotamento).
+1. Start with Phase 2 (relocatable Python prototype).
+2. After validation, apply Phase 3 (Go resource detection) and Phase 4 (packaging script).

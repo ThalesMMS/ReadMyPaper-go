@@ -1,39 +1,39 @@
-# Segurança
+# Security
 
-## Modelo de confiança
+## Trust Model
 
-ReadMyPaper é um aplicativo desktop local. PDFs devem ser tratados como entrada não confiável, e endpoints LLM como serviços externos mesmo quando executados na máquina local.
+ReadMyPaper is a local desktop application. PDFs must be treated as untrusted input, and LLM endpoints must be treated as external services even when they run on the local machine.
 
-## Controles implementados
+## Implemented Controls
 
-- validação do cabeçalho `%PDF-` antes de criar o job;
-- limites configuráveis de tamanho, páginas, workers e fila;
-- IDs de job criptograficamente aleatórios;
-- cópia do PDF para um diretório controlado antes do processamento;
-- escrita atômica de texto, metadados, modelos e áudio temporário;
-- validação de caminhos antes de restaurar ou excluir artefatos;
-- execução dos bridges TTS por `exec.CommandContext`, sem shell;
-- texto e opções trafegam por JSON temporário, não por argumentos de linha de comando;
-- timeout, limite de resposta e bloqueio de redirects no cliente LLM;
-- política fail-open do LLM para evitar perda silenciosa de conteúdo;
-- cancelamento dos subprocessos TTS e jobs no encerramento.
+- `%PDF-` header validation before job creation;
+- configurable limits for size, pages, workers, and queue depth;
+- cryptographically random job IDs;
+- PDF copy into a controlled directory before processing;
+- atomic writes for text, metadata, models, and temporary audio;
+- path validation before restoring or deleting artifacts;
+- TTS bridge execution through `exec.CommandContext`, without a shell;
+- text and options travel through temporary JSON, not command-line arguments;
+- timeout, response limit, and redirect blocking in the LLM client;
+- LLM fail-open policy to avoid silent content loss;
+- TTS subprocess and job cancellation on shutdown.
 
-## Dados enviados pela rede
+## Data Sent Over The Network
 
-- Piper: download do modelo e do JSON da voz selecionada.
-- Kokoro: downloads administrados pelo pacote/model hub usado pelo runtime Kokoro.
-- LLM: somente quando habilitado; os blocos sobreviventes da etapa espacial são enviados ao endpoint configurado para classificação e ordenação.
+- Piper: selected voice model and JSON download.
+- Kokoro: downloads managed by the package/model hub used by the Kokoro runtime.
+- LLM: only when enabled; blocks that survive the spatial stage are sent to the configured endpoint for classification and ordering.
 
-Não há telemetria.
+There is no telemetry.
 
-## Recomendações
+## Recommendations
 
-- prefira endpoint LLM em loopback ou rede confiável;
-- use HTTPS e token específico quando o endpoint não estiver em loopback;
-- não execute o aplicativo com privilégios administrativos;
-- mantenha Go, Fyne, Python e pacotes TTS atualizados;
-- processe PDFs sensíveis somente em ambiente cuja política de cache e backup seja conhecida.
+- prefer an LLM endpoint on loopback or a trusted network;
+- use HTTPS and a dedicated token when the endpoint is not on loopback;
+- do not run the app with administrative privileges;
+- keep Go, Fyne, Python, and TTS packages updated;
+- process sensitive PDFs only in an environment with known cache and backup policies.
 
-## Relato de vulnerabilidade
+## Vulnerability Reporting
 
-Não publique documentos sensíveis, tokens ou modelos privados em um issue. Envie um relato mínimo reproduzível ao mantenedor do repositório, incluindo versão, sistema operacional, impacto e passos de reprodução sem dados clínicos ou pessoais.
+Do not publish sensitive documents, tokens, or private models in an issue. Send a minimal reproducible report to the repository maintainer, including version, operating system, impact, and reproduction steps without clinical or personal data.

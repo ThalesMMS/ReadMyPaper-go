@@ -1,62 +1,62 @@
 # ReadMyPaper — Go/Fyne
 
-Aplicativo desktop local para transformar artigos científicos em PDF em texto limpo e áudio WAV. Esta implementação porta o fluxo do **ReadMyPaper-py** para **Go**, com interface nativa em **Fyne** e organização modular para extração, limpeza, persistência, revisão opcional por LLM e síntese de voz.
+Local desktop app that converts scientific PDF articles into cleaned text and WAV audio. This implementation ports the **ReadMyPaper-py** workflow to **Go**, with a native **Fyne** interface and modular organization for extraction, cleaning, persistence, optional LLM review, and speech synthesis.
 
-## Funcionalidades
+## Features
 
-- seleção de PDF por interface desktop;
-- validação de assinatura, tamanho e limite de páginas;
-- extração local de texto e coordenadas do PDF em Go;
-- reparo heurístico da ordem de leitura em artigos com múltiplas colunas;
-- filtragem espacial de conteúdo associado a figuras, tabelas e legendas;
-- limpeza orientada a artigos científicos, incluindo front matter, referências, agradecimentos, apêndices e citações numéricas;
-- preservação opcional de títulos e cabeçalhos;
-- detecção automática de inglês ou português brasileiro;
-- verbalização de notação científica para leitura natural;
-- revisão opcional de blocos por endpoint OpenAI-compatible local;
-- TTS local com **Piper** (rápido) ou **Kokoro** (qualidade), com fallback de Kokoro para Piper;
-- fila concorrente de jobs, progresso, histórico persistente e restauração após reiniciar;
-- reprodução local e exportação do WAV, texto limpo e PDF original;
-- retenção opcional por TTL e exclusão segura dos artefatos de um job.
+- PDF selection through a desktop interface;
+- PDF signature, size, and page-count validation;
+- local text and coordinate extraction from PDFs in Go;
+- heuristic reading-order repair for multi-column articles;
+- spatial filtering of content associated with figures, tables, and captions;
+- scientific-article cleaning, including front matter, references, acknowledgements, appendices, and numeric citations;
+- optional preservation of titles and headings;
+- automatic English or Brazilian Portuguese detection;
+- scientific-notation verbalization for natural listening;
+- optional block review through a local OpenAI-compatible endpoint;
+- local TTS with **Piper** (fast) or **Kokoro** (quality), with Kokoro fallback to Piper;
+- concurrent job queue, progress tracking, persistent history, and restore after restart;
+- local playback and export of the WAV, cleaned text, and original PDF;
+- optional TTL retention and safe deletion of a job's artifacts.
 
-## Arquitetura
+## Architecture
 
 ```text
-cmd/readmypaper/          entrada do aplicativo Fyne
-internal/app/             interface desktop e reprodução de WAV
-internal/pdfextract/      extração posicionada de PDF em Go
-internal/cleaner/         ordem de leitura, filtros e verbalização
-internal/llm/             cliente OpenAI-compatible com fail-open por lote
-internal/tts/             catálogo, download de vozes e backends Piper/Kokoro
-internal/jobs/            store concorrente, execução e persistência
-internal/pipeline/        orquestração do processamento
-internal/config/          diretórios, limites e variáveis de ambiente
-internal/domain/          tipos compartilhados
-internal/util/            arquivos, URLs, IDs e validação WAV
+cmd/readmypaper/          Fyne app entry point
+internal/app/             desktop interface and WAV playback
+internal/pdfextract/      positioned PDF extraction in Go
+internal/cleaner/         reading order, filters, and verbalization
+internal/llm/             OpenAI-compatible client with per-batch fail-open behavior
+internal/tts/             voice catalog, voice download, and Piper/Kokoro backends
+internal/jobs/            concurrent store, execution, and persistence
+internal/pipeline/        processing orchestration
+internal/config/          directories, limits, and environment variables
+internal/domain/          shared types
+internal/util/            files, URLs, IDs, and WAV validation
 ```
 
-O núcleo do aplicativo, a interface, o processamento de PDF, a limpeza e a orquestração são implementados em Go. Piper e Kokoro são acionados por pequenos bridges Python incorporados ao binário, pois os runtimes de referência desses modelos são distribuídos como pacotes Python. Nenhum servidor web é necessário.
+The app core, interface, PDF processing, cleaning, and orchestration are implemented in Go. Piper and Kokoro are invoked through small Python bridges embedded in the binary because the reference runtimes for those models are distributed as Python packages. No web server is required.
 
-Uma descrição técnica mais detalhada está em [ARCHITECTURE.md](ARCHITECTURE.md).
+A more detailed technical description is available in [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Requisitos
+## Requirements
 
-### Comuns
+### Common
 
-- Go **1.24.1** ou mais recente;
-- Python **3.10–3.12** para os backends TTS ao executar pelo código-fonte; o pacote macOS autocontido já embute Python 3.12 e os pacotes TTS;
-- acesso à internet no primeiro uso de cada voz/modelo; depois os artefatos ficam em cache local.
+- Go **1.24.1** or newer;
+- Python **3.10-3.12** for the TTS backends when running from source; the self-contained macOS package already embeds Python 3.12 and the TTS packages;
+- internet access the first time each voice/model is used; after that, artifacts are kept in the local cache.
 
 ### Linux (Debian/Ubuntu)
 
-Instale as dependências de compilação do Fyne e, para Kokoro, `espeak-ng`:
+Install the Fyne build dependencies and, for Kokoro, `espeak-ng`:
 
 ```bash
 sudo apt update
 sudo apt install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev espeak-ng
 ```
 
-Para reprodução pelo botão **Play**, tenha ao menos um destes comandos: `ffplay`, `paplay` ou `aplay`.
+For playback through the **Play** button, make sure at least one of these commands is available: `ffplay`, `paplay`, or `aplay`.
 
 ### macOS
 
@@ -65,17 +65,17 @@ xcode-select --install
 brew install espeak-ng
 ```
 
-A reprodução usa `afplay`, já fornecido pelo macOS.
+Playback uses `afplay`, which is already provided by macOS.
 
 ### Windows
 
-Use Go com um compilador C compatível com Fyne, como o toolchain MinGW-w64 do MSYS2. Para Kokoro, instale também o eSpeak NG. A reprodução usa PowerShell e `System.Media.SoundPlayer`.
+Use Go with a C compiler compatible with Fyne, such as the MSYS2 MinGW-w64 toolchain. For Kokoro, also install eSpeak NG. Playback uses PowerShell and `System.Media.SoundPlayer`.
 
-## Instalação dos backends TTS
+## TTS Backend Installation
 
-Ao usar o pacote macOS gerado por `make package-macos`, pule esta seção: o runtime Python e os pacotes de `requirements-tts.txt` ficam dentro do `.app`.
+When using the macOS package generated by `make package-macos`, skip this section: the Python runtime and the packages from `requirements-tts.txt` are inside the `.app`.
 
-Crie um ambiente virtual no diretório do projeto:
+Create a virtual environment in the project directory:
 
 ### Linux/macOS
 
@@ -95,53 +95,53 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements-tts.txt
 ```
 
-O aplicativo procura `python3`, `python` ou `py -3`. Para fixar o interpretador do ambiente virtual:
+The app looks for `python3`, `python`, or `py -3`. To pin the virtual-environment interpreter:
 
 ```bash
 export READMYPAPER_PYTHON_BIN="$PWD/.venv/bin/python"
 ```
 
-No PowerShell:
+In PowerShell:
 
 ```powershell
 $env:READMYPAPER_PYTHON_BIN = "$PWD\.venv\Scripts\python.exe"
 ```
 
-## Executar
+## Run
 
 ```bash
 go run ./cmd/readmypaper
 ```
 
-Consultar a versão sem abrir a interface:
+Print the version without opening the interface:
 
 ```bash
 go run ./cmd/readmypaper --version
 ```
 
-## Compilar
+## Build
 
 ```bash
 mkdir -p bin
 go build -trimpath -o bin/readmypaper ./cmd/readmypaper
 ```
 
-No Windows, use `bin/readmypaper.exe` como destino. Para empacotar com os metadados de `FyneApp.toml`:
+On Windows, use `bin/readmypaper.exe` as the destination. To package with the metadata from `FyneApp.toml`:
 
 ```bash
 go install fyne.io/tools/cmd/fyne@latest
 fyne package
 ```
 
-### Pacote macOS autocontido
+### Self-Contained macOS Package
 
-Para gerar `dist/ReadMyPaper.app` com o binário Go, Python standalone e os backends Piper/Kokoro instalados:
+Generate `dist/ReadMyPaper.app` with the Go binary, standalone Python, and installed Piper/Kokoro backends:
 
 ```bash
 make package-macos
 ```
 
-Arquiteturas explícitas:
+Explicit architectures:
 
 ```bash
 scripts/package-macos.sh --arch arm64
@@ -149,102 +149,102 @@ scripts/package-macos.sh --arch x86_64
 scripts/package-macos.sh --arch universal
 ```
 
-O script baixa o Python relocável de `astral-sh/python-build-standalone`, instala `requirements-tts.txt` diretamente em `Contents/Resources/python` e monta o bundle com `Info.plist`, `Icon.png` e `CFBundleIdentifier=io.github.thalesmms.readmypaper`. Para `--arch universal`, ele cria um binário Go universal e inclui runtimes Python separados em `python-arm64` e `python-x86_64`; o build host precisa conseguir executar os dois Pythons para instalar as wheels. O build arm64 validado em 2026-06-24 gerou um `.app` de ~854 MB, principalmente por causa das dependências atuais do Kokoro.
+The script downloads the relocatable Python build from `astral-sh/python-build-standalone`, installs `requirements-tts.txt` directly into `Contents/Resources/python`, and assembles the bundle with `Info.plist`, `Icon.png`, and `CFBundleIdentifier=io.github.thalesmms.readmypaper`. For `--arch universal`, it creates a universal Go binary and includes separate Python runtimes in `python-arm64` and `python-x86_64`; the build host must be able to run both Pythons to install the wheels. The arm64 build validated on 2026-06-24 produced an `.app` of about 854 MB, mostly because of the current Kokoro dependencies.
 
-Assinatura e notarização são opcionais:
+Signing and notarization are optional:
 
 ```bash
-CODESIGN_IDENTITY="Developer ID Application: Seu Nome (TEAMID)" \
+CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 NOTARY_PROFILE="readmypaper-notary" \
 make package-macos
 ```
 
-Sem Developer ID, o app local é gerado sem assinatura de distribuição; ao compartilhar o bundle, o usuário pode precisar autorizá-lo em **Segurança e Privacidade**. As vozes e modelos continuam sendo baixados no primeiro uso e salvos em `~/Library/Caches/ReadMyPaper`, mantendo o bundle menor.
+Without a Developer ID, the local app is generated without a distribution signature; when sharing the bundle, the user may need to authorize it in **Security & Privacy**. Voices and models are still downloaded on first use and saved in `~/Library/Caches/ReadMyPaper`, keeping the bundle smaller.
 
-## Uso
+## Usage
 
-1. Abra **New job** e selecione um PDF.
-2. Escolha idioma, voz, engine e velocidade.
-3. Ajuste as regras de limpeza.
-4. Opcionalmente habilite um endpoint LLM local compatível com `/chat/completions`.
-5. Clique em **Process PDF**.
-6. Acompanhe o job na aba **Jobs** e salve ou reproduza os resultados.
+1. Open **New job** and select a PDF.
+2. Choose the language, voice, engine, and speed.
+3. Adjust the cleanup rules.
+4. Optionally enable a local LLM endpoint compatible with `/chat/completions`.
+5. Click **Process PDF**.
+6. Track the job in the **Jobs** tab and save or play the results.
 
-Piper baixa apenas a voz escolhida no primeiro uso. Kokoro administra seu próprio cache de modelo. Quando Kokoro falha, o pipeline tenta Piper automaticamente e informa o engine efetivamente usado.
+Piper downloads only the selected voice on first use. Kokoro manages its own model cache. When Kokoro fails, the pipeline automatically tries Piper and reports the engine that was actually used.
 
-## Endpoint LLM opcional
+## Optional LLM Endpoint
 
-A URL pode ser informada como `127.0.0.1:11434/v1` ou como URL HTTP(S) completa. O cliente acrescenta `/chat/completions`, rejeita credenciais embutidas, query string e fragmentos, limita o tamanho das respostas e não segue redirecionamentos.
+The URL can be provided as `127.0.0.1:11434/v1` or as a complete HTTP(S) URL. The client appends `/chat/completions`, rejects embedded credentials, query strings, and fragments, limits response size, and does not follow redirects.
 
-A chave de API pode ser digitada no campo **API key** da seção LLM. Esse valor é usado apenas no job em execução e não é gravado em `metadata.json`. `READMYPAPER_LLM_API_KEY` continua servindo como valor inicial do campo.
+The API key can be typed in the **API key** field in the LLM section. This value is used only for the running job and is not written to `metadata.json`. `READMYPAPER_LLM_API_KEY` still provides the initial field value.
 
-O modelo recebe blocos de texto e metadados de layout em lotes delimitados. A saída só pode manter, remover ou reordenar blocos; reescrita textual é deliberadamente ignorada. Em erro de rede ou resposta inválida, o lote é mantido sem alteração.
+The model receives text blocks and layout metadata in bounded batches. The output may only keep, drop, or reorder blocks; textual rewriting is deliberately ignored. On network errors or invalid responses, the batch is kept unchanged.
 
-## Diretórios de dados
+## Data Directories
 
-| Plataforma | Dados | Cache |
+| Platform | Data | Cache |
 | --- | --- | --- |
 | Linux | `~/.local/share/ReadMyPaper` | `~/.cache/ReadMyPaper` |
 | macOS | `~/Library/Application Support/ReadMyPaper` | `~/Library/Caches/ReadMyPaper` |
 | Windows | `%LOCALAPPDATA%\ReadMyPaper` | `%LOCALAPPDATA%\ReadMyPaper\Cache` |
 
-Os PDFs copiados ficam em `uploads/<job-id>`. Texto, áudio e `metadata.json` ficam em `outputs/<job-id>`. Quando o TTL está habilitado, a inicialização também remove diretórios órfãos antigos deixados por jobs interrompidos ou metadados inválidos.
+Copied PDFs are stored in `uploads/<job-id>`. Text, audio, and `metadata.json` are stored in `outputs/<job-id>`. When TTL is enabled, startup also removes old orphaned directories left by interrupted jobs or invalid metadata.
 
-## Configuração por ambiente
+## Environment Configuration
 
-| Variável | Padrão | Finalidade |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `READMYPAPER_DATA_DIR` | diretório de dados da plataforma | PDFs e resultados |
-| `READMYPAPER_CACHE_DIR` | diretório de cache da plataforma | vozes, modelos e bridges |
-| `READMYPAPER_MAX_WORKERS` | `2` | jobs processados simultaneamente |
-| `READMYPAPER_MAX_UPLOAD_BYTES` | `52428800` | tamanho máximo do PDF |
-| `READMYPAPER_MAX_PDF_PAGES` | `200` | número máximo de páginas |
-| `READMYPAPER_SPEECH_RATE_MIN` | `0.5` | velocidade mínima da UI/API interna |
-| `READMYPAPER_SPEECH_RATE_MAX` | `2.0` | velocidade máxima da UI/API interna |
-| `READMYPAPER_MAX_PENDING_JOBS` | `10` | jobs pendentes ou em execução |
-| `READMYPAPER_JOB_RETENTION_HOURS` | `0` | TTL aplicado na inicialização; `0` desabilita |
-| `READMYPAPER_LLM_URL` | vazio | URL OpenAI-compatible padrão |
-| `READMYPAPER_LLM_MODEL` | vazio | modelo enviado ao endpoint |
-| `READMYPAPER_LLM_ENABLED` | `false` | inicia a opção LLM marcada |
-| `READMYPAPER_LLM_API_KEY` | `apikey` | bearer token do endpoint local |
-| `READMYPAPER_PYTHON_BIN` | Python embutido no `.app`, depois `PATH` | interpretador dos bridges TTS |
+| `READMYPAPER_DATA_DIR` | platform data directory | PDFs and results |
+| `READMYPAPER_CACHE_DIR` | platform cache directory | voices, models, and bridges |
+| `READMYPAPER_MAX_WORKERS` | `2` | jobs processed simultaneously |
+| `READMYPAPER_MAX_UPLOAD_BYTES` | `52428800` | maximum PDF size |
+| `READMYPAPER_MAX_PDF_PAGES` | `200` | maximum page count |
+| `READMYPAPER_SPEECH_RATE_MIN` | `0.5` | minimum speed in the UI/internal API |
+| `READMYPAPER_SPEECH_RATE_MAX` | `2.0` | maximum speed in the UI/internal API |
+| `READMYPAPER_MAX_PENDING_JOBS` | `10` | pending or running jobs |
+| `READMYPAPER_JOB_RETENTION_HOURS` | `0` | TTL applied at startup; `0` disables it |
+| `READMYPAPER_LLM_URL` | empty | default OpenAI-compatible URL |
+| `READMYPAPER_LLM_MODEL` | empty | model sent to the endpoint |
+| `READMYPAPER_LLM_ENABLED` | `false` | starts with the LLM option checked |
+| `READMYPAPER_LLM_API_KEY` | `apikey` | bearer token for the local endpoint |
+| `READMYPAPER_PYTHON_BIN` | Python embedded in the `.app`, then `PATH` | interpreter for the TTS bridges |
 
-Valores numéricos inválidos usam o padrão, exceto limites estruturalmente impossíveis, que impedem a inicialização com mensagem explícita.
+Invalid numeric values use the default, except for structurally impossible limits, which prevent startup with an explicit message.
 
-## Testes e qualidade
+## Tests And Quality
 
 ```bash
 go test ./...
 go vet ./...
 ```
 
-Em ambientes sem OpenGL/X11, como CI headless:
+In environments without OpenGL/X11, such as headless CI:
 
 ```bash
 go test -tags ci ./...
 go build -tags ci -o bin/readmypaper-ci ./cmd/readmypaper
 ```
 
-Os testes cobrem ordem multicoluna, filtro espacial, limpeza científica, verbalização, extração PDF, LLM, catálogo de vozes, persistência, store concorrente, pipeline e construção da interface Fyne.
+The tests cover multi-column ordering, spatial filtering, scientific cleaning, verbalization, PDF extraction, LLM, voice catalog, persistence, concurrent store behavior, pipeline behavior, and Fyne interface construction.
 
-## Privacidade e segurança
+## Privacy And Security
 
-- não há telemetria;
-- PDFs e resultados permanecem nos diretórios locais do aplicativo;
-- a rede é usada para baixar modelos/vozes e apenas quando o LLM opcional está habilitado;
-- deleções são restritas aos diretórios de dados e a identificadores validados;
-- caminhos restaurados de metadados são aceitos somente dentro da raiz de uploads;
-- o conteúdo do PDF não é passado em argumentos de shell: os bridges recebem um arquivo JSON temporário e são executados sem shell.
+- there is no telemetry;
+- PDFs and results remain in the app's local directories;
+- the network is used to download models/voices and only when the optional LLM is enabled;
+- deletions are restricted to data directories and validated identifiers;
+- restored metadata paths are accepted only inside the uploads root;
+- PDF content is not passed through shell arguments: the bridges receive a temporary JSON file and are executed without a shell.
 
-Consulte [SECURITY.md](SECURITY.md) para o modelo de confiança.
+See [SECURITY.md](SECURITY.md) for the trust model.
 
-## Limitações conhecidas
+## Known Limitations
 
-- PDFs compostos apenas por imagens não passam por OCR; o aplicativo informa que o documento requer OCR.
-- A extração nativa usa heurísticas de glifos, fontes e geometria. PDFs com encoding não padrão, layouts muito ornamentados ou tabelas sem contorno podem exigir ajustes.
-- O botão de reprodução depende de um player WAV já disponível no sistema.
-- O primeiro uso pode ser demorado devido ao download e inicialização dos modelos TTS.
+- Image-only PDFs are not processed with OCR; the app reports that the document requires OCR.
+- Native extraction uses glyph, font, and geometry heuristics. PDFs with nonstandard encoding, highly ornamental layouts, or borderless tables may require tuning.
+- The playback button depends on a WAV player already available on the system.
+- First use can be slow because TTS models must be downloaded and initialized.
 
-## Licença
+## License
 
-GPL-3.0-or-later, em continuidade com o projeto Python de referência. Consulte [LICENSE](LICENSE).
+GPL-3.0-or-later, continuing the reference Python project. See [LICENSE](LICENSE).

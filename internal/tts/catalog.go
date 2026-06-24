@@ -49,13 +49,13 @@ var voiceSpecs = map[string]VoiceSpec{
 		Folder: "en/en_US/hfc_female/medium", ModelFilename: "en_US-hfc_female-medium.onnx", ConfigFilename: "en_US-hfc_female-medium.onnx.json",
 	},
 	"pt_BR-faber-medium": {
-		Key: "pt_BR-faber-medium", LanguageCode: "pt-BR", LanguageLabel: "Português (Brasil)",
-		DisplayName: "Português — Faber (Piper, rápido)", Engine: "piper",
+		Key: "pt_BR-faber-medium", LanguageCode: "pt-BR", LanguageLabel: "Brazilian Portuguese",
+		DisplayName: "Brazilian Portuguese — Faber (Piper, fast)", Engine: "piper",
 		Folder: "pt/pt_BR/faber/medium", ModelFilename: "pt_BR-faber-medium.onnx", ConfigFilename: "pt_BR-faber-medium.onnx.json",
 	},
 	"pt_BR-cadu-medium": {
-		Key: "pt_BR-cadu-medium", LanguageCode: "pt-BR", LanguageLabel: "Português (Brasil)",
-		DisplayName: "Português — Cadu (Piper, rápido)", Engine: "piper",
+		Key: "pt_BR-cadu-medium", LanguageCode: "pt-BR", LanguageLabel: "Brazilian Portuguese",
+		DisplayName: "Brazilian Portuguese — Cadu (Piper, fast)", Engine: "piper",
 		Folder: "pt/pt_BR/cadu/medium", ModelFilename: "pt_BR-cadu-medium.onnx", ConfigFilename: "pt_BR-cadu-medium.onnx.json",
 	},
 	"kokoro-en-heart": {
@@ -71,8 +71,8 @@ var voiceSpecs = map[string]VoiceSpec{
 		DisplayName: "English — Bella (Kokoro, quality)", Engine: "kokoro", KokoroVoice: "af_bella",
 	},
 	"kokoro-pt-dora": {
-		Key: "kokoro-pt-dora", LanguageCode: "pt-BR", LanguageLabel: "Português (Brasil)",
-		DisplayName: "Português — Dora (Kokoro, qualidade)", Engine: "kokoro", KokoroVoice: "pf_dora",
+		Key: "kokoro-pt-dora", LanguageCode: "pt-BR", LanguageLabel: "Brazilian Portuguese",
+		DisplayName: "Brazilian Portuguese — Dora (Kokoro, quality)", Engine: "kokoro", KokoroVoice: "pf_dora",
 	},
 }
 

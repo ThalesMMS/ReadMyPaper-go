@@ -9,4 +9,4 @@ VENV_DIR="${VENV_DIR:-.venv}"
 . "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install -r requirements-tts.txt
-printf '\nTTS instalado. Antes de executar:\n  export READMYPAPER_PYTHON_BIN="%s/bin/python"\n' "$PWD/$VENV_DIR"
+printf '\nTTS installed. Before running:\n  export READMYPAPER_PYTHON_BIN="%s/bin/python"\n' "$PWD/$VENV_DIR"
