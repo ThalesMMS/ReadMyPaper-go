@@ -17,7 +17,7 @@ Disponibilizar o `ReadMyPaper-go` como um aplicativo `.app` para macOS que abre 
 
 ### 1. Python relocável
 
-Usar como base o **Python standalone** do projeto `indygreg/python-build-standalone`. Essa distribuição já é compilada para ser relocável no macOS e funciona quando copiada para dentro de um `.app`.
+Usar como base o **Python standalone** do projeto `astral-sh/python-build-standalone` (continuação do `indygreg/python-build-standalone`). Essa distribuição já é compilada para ser relocável no macOS e funciona quando copiada para dentro de um `.app`.
 
 Pacotes a instalar no Python embarcado:
 
@@ -26,6 +26,8 @@ Pacotes a instalar no Python embarcado:
 - quaisquer outras dependências listadas em `requirements-tts.txt`
 
 A instalação deve ser feita diretamente no Python relocável, sem criar `venv` interno, para reduzir complexidade e caminhos absolutos.
+
+O script `scripts/package-macos.sh` usa CPython 3.12 por padrão e permite trocar a origem com `PYTHON_STANDALONE_REPO`, `PYTHON_VERSION_PREFIX` ou URLs explícitas por arquitetura.
 
 ### 2. Estrutura do `.app`
 
@@ -53,7 +55,8 @@ A ordem de resolução do interpretador deve ser:
 
 1. `READMYPAPER_PYTHON_BIN` se estiver definida (modo desenvolvimento).
 2. Python bundled em `Contents/Resources/python/bin/python3`.
-3. `python3` do `PATH` (fallback para máquinas de desenvolvimento).
+3. Python bundled específico da arquitetura em `Contents/Resources/python-arm64/bin/python3` ou `Contents/Resources/python-x86_64/bin/python3`, usado pelo pacote universal.
+4. `python3` do `PATH` (fallback para máquinas de desenvolvimento).
 
 ### 4. Cache de vozes e modelos
 
@@ -133,9 +136,9 @@ Vozes e modelos TTS continuarão sendo baixados na primeira execução e armazen
 
 ## Tamanho esperado do bundle
 
-- Python standalone com dependências: ~150–250 MB.
-- Binário Go: ~20–40 MB.
-- Total estimado: ~200–300 MB.
+- Build arm64 validado em 2026-06-24: `dist/ReadMyPaper.app` ficou com ~854 MB.
+- O maior custo vem do Kokoro e suas dependências atuais, incluindo Torch, spaCy, Transformers e rodas nativas.
+- Builds apenas com Piper ficariam substancialmente menores, mas não atendem ao objetivo deste pacote autocontido com Piper e Kokoro.
 
 ## Riscos e limitações
 

@@ -116,7 +116,8 @@ func (p *ReadMyPaperPipeline) Process(
 		llmBase = strings.TrimSpace(p.Settings.LLMBaseURL)
 	}
 	if options.UseLLMCleaner && llmBase != "" {
-		if p.LLM == nil {
+		llmClient := p.llmClientForOptions(options)
+		if llmClient == nil {
 			return domain.JobResult{}, fmt.Errorf("LLM cleaner is enabled but no LLM client is configured")
 		}
 		emit(0.42, "Reviewing blocks with local LLM")
@@ -129,7 +130,7 @@ func (p *ReadMyPaperPipeline) Process(
 		if strings.TrimSpace(model) == "" {
 			model = p.Settings.LLMModel
 		}
-		llmBlocks, llmErr := p.LLM.CleanAndReorderBlocks(ctx, blocks, normalized, model, &stats)
+		llmBlocks, llmErr := llmClient.CleanAndReorderBlocks(ctx, blocks, normalized, model, &stats)
 		if llmErr != nil {
 			log.Printf("ReadMyPaper: %v", llmErr)
 		}
@@ -213,6 +214,17 @@ func (p *ReadMyPaperPipeline) Process(
 		CleanedTextPath: textPath, AudioPath: audioPath, OriginalPDFPath: pdfPath,
 		DetectedLanguage: effectiveLanguage, EngineUsed: engineUsed, Stats: &stats,
 	}, nil
+}
+
+func (p *ReadMyPaperPipeline) llmClientForOptions(options domain.ProcessingOptions) *llm.Client {
+	apiKey := strings.TrimSpace(options.LLMAPIKey)
+	if apiKey == "" {
+		return p.LLM
+	}
+	if p.LLM != nil && apiKey == strings.TrimSpace(p.Settings.LLMAPIKey) {
+		return p.LLM
+	}
+	return llm.NewClient(apiKey)
 }
 
 func validateOptions(options *domain.ProcessingOptions, settings config.Settings) error {

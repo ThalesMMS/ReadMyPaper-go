@@ -1,7 +1,7 @@
 APP := readmypaper
 CMD := ./cmd/readmypaper
 
-.PHONY: run build test test-ci vet fmt check clean package
+.PHONY: run build test test-ci vet fmt check clean package package-macos
 
 run:
 	go run $(CMD)
@@ -31,3 +31,6 @@ clean:
 
 package:
 	fyne package
+
+package-macos:
+	scripts/package-macos.sh

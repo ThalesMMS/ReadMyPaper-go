@@ -61,6 +61,7 @@ type Desktop struct {
 	useLLM      *widget.Check
 	llmURL      *widget.Entry
 	llmModel    *widget.Entry
+	llmAPIKey   *widget.Entry
 	llmFields   *fyne.Container
 	process     *widget.Button
 	formStatus  *widget.Label
@@ -109,7 +110,6 @@ func (d *Desktop) build() {
 	headerTitle := widget.NewLabelWithStyle("ReadMyPaper", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	headerTitle.TextStyle = fyne.TextStyle{Bold: true}
 	headerSubtitle := widget.NewLabel("Local PDF → cleaned scientific text → spoken reading")
-	headerSubtitle.Importance = widget.LowImportance
 	header := container.NewVBox(headerTitle, headerSubtitle)
 
 	d.window.SetContent(container.NewBorder(container.NewPadded(header), nil, nil, nil, d.tabs))
@@ -139,7 +139,6 @@ func (d *Desktop) buildNewJobView() fyne.CanvasObject {
 	)
 
 	d.fileLabel = wrapLabel(noPDFSelected)
-	d.fileLabel.Importance = widget.LowImportance
 	chooseFile := widget.NewButtonWithIcon("Choose PDF", theme.FolderOpenIcon(), d.choosePDF)
 	fileRow := container.NewBorder(nil, nil, chooseFile, nil, container.NewPadded(d.fileLabel))
 
@@ -191,9 +190,11 @@ func (d *Desktop) buildNewJobView() fyne.CanvasObject {
 	d.llmModel = widget.NewEntry()
 	d.llmModel.SetPlaceHolder("Optional model name")
 	d.llmModel.SetText(d.settings.LLMModel)
+	d.llmAPIKey = widget.NewPasswordEntry()
+	d.llmAPIKey.SetPlaceHolder("Optional bearer token")
+	d.llmAPIKey.SetText(d.settings.LLMAPIKey)
 	llmHelp := wrapLabel("The endpoint must expose /chat/completions. Failed LLM batches are kept unchanged.")
-	llmHelp.Importance = widget.LowImportance
-	d.llmFields = container.NewVBox(field("LLM base URL", d.llmURL), llmHelp, field("Model", d.llmModel))
+	d.llmFields = container.NewVBox(field("LLM base URL", d.llmURL), llmHelp, field("Model", d.llmModel), field("API key", d.llmAPIKey))
 	if !d.settings.LLMEnabled {
 		d.llmFields.Hide()
 	}
@@ -204,7 +205,6 @@ func (d *Desktop) buildNewJobView() fyne.CanvasObject {
 	d.process = widget.NewButtonWithIcon("Process PDF", theme.MediaPlayIcon(), d.submitJob)
 	d.process.Importance = widget.HighImportance
 	d.formStatus = wrapLabel("")
-	d.formStatus.Importance = widget.LowImportance
 	form := widget.NewCard("New job", "", container.NewVBox(
 		field("PDF", fileRow), fields, cleanup, d.formStatus, d.process,
 	))
@@ -230,7 +230,6 @@ func (d *Desktop) buildJobsView() fyne.CanvasObject {
 		func() fyne.CanvasObject {
 			title := widget.NewLabelWithStyle("document.pdf", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 			status := widget.NewLabel("Queued")
-			status.Importance = widget.LowImportance
 			return container.NewBorder(nil, nil, nil, status, title)
 		},
 		func(id widget.ListItemID, object fyne.CanvasObject) {
@@ -258,7 +257,6 @@ func (d *Desktop) buildJobsView() fyne.CanvasObject {
 
 	d.detailTitle = widget.NewLabelWithStyle("Select a job", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	d.detailID = wrapLabel("")
-	d.detailID.Importance = widget.LowImportance
 	d.detailStatus = widget.NewLabel("")
 	d.detailStatus.Alignment = fyne.TextAlignTrailing
 	d.detailStep = widget.NewLabel("")
@@ -278,7 +276,6 @@ func (d *Desktop) buildJobsView() fyne.CanvasObject {
 	d.preview = widget.NewMultiLineEntry()
 	d.preview.Wrapping = fyne.TextWrapWord
 	d.preview.SetMinRowsVisible(14)
-	d.preview.Disable()
 	d.statsLabel = wrapLabel("No statistics available.")
 
 	progressHeader := container.NewBorder(nil, nil, d.detailStep, d.detailPercent)
@@ -385,6 +382,7 @@ func (d *Desktop) submitJob() {
 	options.TTSEngine = selectedEngine(d.engine)
 	options.UseLLMCleaner = d.useLLM.Checked
 	options.LLMModel = strings.TrimSpace(d.llmModel.Text)
+	options.LLMAPIKey = strings.TrimSpace(d.llmAPIKey.Text)
 	if options.UseLLMCleaner {
 		normalized, err := util.NormalizeBaseURL(d.llmURL.Text)
 		if err != nil {

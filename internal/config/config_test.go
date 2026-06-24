@@ -1,7 +1,9 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -43,4 +45,97 @@ func TestLoadRejectsNonPositiveStructuralLimits(t *testing.T) {
 	if _, err := Load(); err == nil {
 		t.Fatal("expected a non-positive upload limit to be rejected")
 	}
+}
+
+func TestResolvePythonBinaryUsesEnvironmentBeforeBundle(t *testing.T) {
+	executable, _ := createBundlePython(t)
+
+	got := resolvePythonBinaryForExecutable(executable, func(name string) string {
+		if name == "READMYPAPER_PYTHON_BIN" {
+			return " /custom/python "
+		}
+		return ""
+	})
+
+	if got != "/custom/python" {
+		t.Fatalf("environment override was not preferred: got %q", got)
+	}
+}
+
+func TestResolvePythonBinaryUsesBundledPythonInsideApp(t *testing.T) {
+	executable, bundledPython := createBundlePython(t)
+
+	got := resolvePythonBinaryForExecutable(executable, func(string) string { return "" })
+
+	if got != bundledPython {
+		t.Fatalf("bundled Python was not resolved: got %q, want %q", got, bundledPython)
+	}
+}
+
+func TestResolvePythonBinaryUsesArchSpecificBundledPython(t *testing.T) {
+	executable, bundledPython := createArchSpecificBundlePython(t)
+
+	got := resolvePythonBinaryForExecutable(executable, func(string) string { return "" })
+
+	if got != bundledPython {
+		t.Fatalf("arch-specific bundled Python was not resolved: got %q, want %q", got, bundledPython)
+	}
+}
+
+func TestResolvePythonBinaryFallsBackEmptyOutsideApp(t *testing.T) {
+	executable := filepath.Join(t.TempDir(), "readmypaper")
+	if err := os.WriteFile(executable, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got := resolvePythonBinaryForExecutable(executable, func(string) string { return "" })
+
+	if got != "" {
+		t.Fatalf("expected no configured Python outside an app bundle, got %q", got)
+	}
+}
+
+func createBundlePython(t *testing.T) (string, string) {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "ReadMyPaper.app", "Contents")
+	executable := filepath.Join(root, "MacOS", "readmypaper")
+	python := filepath.Join(root, "Resources", "python", "bin", "python3")
+	for _, directory := range []string{filepath.Dir(executable), filepath.Dir(python)} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(executable, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(python, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return executable, python
+}
+
+func createArchSpecificBundlePython(t *testing.T) (string, string) {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "ReadMyPaper.app", "Contents")
+	executable := filepath.Join(root, "MacOS", "readmypaper")
+	python := filepath.Join(root, "Resources", "python-"+macOSPythonArchName(), "bin", "python3")
+	for _, directory := range []string{filepath.Dir(executable), filepath.Dir(python)} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(executable, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(python, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return executable, python
+}
+
+func macOSPythonArchName() string {
+	if runtime.GOARCH == "amd64" {
+		return "x86_64"
+	}
+	return runtime.GOARCH
 }

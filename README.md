@@ -44,7 +44,7 @@ Uma descrição técnica mais detalhada está em [ARCHITECTURE.md](ARCHITECTURE.
 ### Comuns
 
 - Go **1.24.1** ou mais recente;
-- Python **3.10–3.12** para os backends TTS; Python 3.12 é a opção mais compatível;
+- Python **3.10–3.12** para os backends TTS ao executar pelo código-fonte; o pacote macOS autocontido já embute Python 3.12 e os pacotes TTS;
 - acesso à internet no primeiro uso de cada voz/modelo; depois os artefatos ficam em cache local.
 
 ### Linux (Debian/Ubuntu)
@@ -72,6 +72,8 @@ A reprodução usa `afplay`, já fornecido pelo macOS.
 Use Go com um compilador C compatível com Fyne, como o toolchain MinGW-w64 do MSYS2. Para Kokoro, instale também o eSpeak NG. A reprodução usa PowerShell e `System.Media.SoundPlayer`.
 
 ## Instalação dos backends TTS
+
+Ao usar o pacote macOS gerado por `make package-macos`, pule esta seção: o runtime Python e os pacotes de `requirements-tts.txt` ficam dentro do `.app`.
 
 Crie um ambiente virtual no diretório do projeto:
 
@@ -131,6 +133,34 @@ go install fyne.io/tools/cmd/fyne@latest
 fyne package
 ```
 
+### Pacote macOS autocontido
+
+Para gerar `dist/ReadMyPaper.app` com o binário Go, Python standalone e os backends Piper/Kokoro instalados:
+
+```bash
+make package-macos
+```
+
+Arquiteturas explícitas:
+
+```bash
+scripts/package-macos.sh --arch arm64
+scripts/package-macos.sh --arch x86_64
+scripts/package-macos.sh --arch universal
+```
+
+O script baixa o Python relocável de `astral-sh/python-build-standalone`, instala `requirements-tts.txt` diretamente em `Contents/Resources/python` e monta o bundle com `Info.plist`, `Icon.png` e `CFBundleIdentifier=io.github.thalesmms.readmypaper`. Para `--arch universal`, ele cria um binário Go universal e inclui runtimes Python separados em `python-arm64` e `python-x86_64`; o build host precisa conseguir executar os dois Pythons para instalar as wheels. O build arm64 validado em 2026-06-24 gerou um `.app` de ~854 MB, principalmente por causa das dependências atuais do Kokoro.
+
+Assinatura e notarização são opcionais:
+
+```bash
+CODESIGN_IDENTITY="Developer ID Application: Seu Nome (TEAMID)" \
+NOTARY_PROFILE="readmypaper-notary" \
+make package-macos
+```
+
+Sem Developer ID, o app local é gerado sem assinatura de distribuição; ao compartilhar o bundle, o usuário pode precisar autorizá-lo em **Segurança e Privacidade**. As vozes e modelos continuam sendo baixados no primeiro uso e salvos em `~/Library/Caches/ReadMyPaper`, mantendo o bundle menor.
+
 ## Uso
 
 1. Abra **New job** e selecione um PDF.
@@ -145,6 +175,8 @@ Piper baixa apenas a voz escolhida no primeiro uso. Kokoro administra seu própr
 ## Endpoint LLM opcional
 
 A URL pode ser informada como `127.0.0.1:11434/v1` ou como URL HTTP(S) completa. O cliente acrescenta `/chat/completions`, rejeita credenciais embutidas, query string e fragmentos, limita o tamanho das respostas e não segue redirecionamentos.
+
+A chave de API pode ser digitada no campo **API key** da seção LLM. Esse valor é usado apenas no job em execução e não é gravado em `metadata.json`. `READMYPAPER_LLM_API_KEY` continua servindo como valor inicial do campo.
 
 O modelo recebe blocos de texto e metadados de layout em lotes delimitados. A saída só pode manter, remover ou reordenar blocos; reescrita textual é deliberadamente ignorada. Em erro de rede ou resposta inválida, o lote é mantido sem alteração.
 
@@ -175,7 +207,7 @@ Os PDFs copiados ficam em `uploads/<job-id>`. Texto, áudio e `metadata.json` fi
 | `READMYPAPER_LLM_MODEL` | vazio | modelo enviado ao endpoint |
 | `READMYPAPER_LLM_ENABLED` | `false` | inicia a opção LLM marcada |
 | `READMYPAPER_LLM_API_KEY` | `apikey` | bearer token do endpoint local |
-| `READMYPAPER_PYTHON_BIN` | autodetectado | interpretador dos bridges TTS |
+| `READMYPAPER_PYTHON_BIN` | Python embutido no `.app`, depois `PATH` | interpretador dos bridges TTS |
 
 Valores numéricos inválidos usam o padrão, exceto limites estruturalmente impossíveis, que impedem a inicialização com mensagem explícita.
 

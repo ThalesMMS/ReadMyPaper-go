@@ -3,6 +3,8 @@ package pipeline
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/ThalesMMS/ReadMyPaper-go/internal/config"
 	"github.com/ThalesMMS/ReadMyPaper-go/internal/domain"
+	"github.com/ThalesMMS/ReadMyPaper-go/internal/llm"
 	"github.com/ThalesMMS/ReadMyPaper-go/internal/tts"
 )
 
@@ -88,6 +91,70 @@ func TestPipelineRejectsPageLimit(t *testing.T) {
 	_, err := pipeline.Process(context.Background(), "source.pdf", filepath.Join(t.TempDir(), "out"), options, nil)
 	if err == nil || !strings.Contains(err.Error(), "configured limit") {
 		t.Fatalf("expected page-limit error, got %v", err)
+	}
+}
+
+func TestPipelineUsesPerJobLLMAPIKeyWithoutPersistingIt(t *testing.T) {
+	root := t.TempDir()
+	settings := config.Settings{
+		DataDir:        filepath.Join(root, "data"),
+		CacheDir:       filepath.Join(root, "cache"),
+		MaxPDFPages:    20,
+		SpeechRateMin:  0.5,
+		SpeechRateMax:  2,
+		MaxWorkers:     1,
+		MaxPendingJobs: 10,
+		LLMAPIKey:      "settings-key",
+	}
+	if err := settings.EnsureDirs(); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer job-key" {
+			t.Fatalf("unexpected Authorization header: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"order\":[0],\"results\":[{\"id\":0,\"action\":\"KEEP\"}]}"}}]}`))
+	}))
+	defer server.Close()
+	box := domain.BBox{Left: 30, Top: 100, Right: 580, Bottom: 130}
+	extraction := domain.ExtractionResult{
+		PageCount: 1,
+		PageSizes: map[int]domain.PageSize{1: {Width: 612, Height: 792}},
+		Blocks: []domain.ExtractedBlock{
+			{Text: "Useful prose for a paper.", Label: "paragraph", PageNo: 1, BBox: &box},
+		},
+	}
+	catalog := tts.NewCatalog(settings.VoicesDir())
+	pipeline := &ReadMyPaperPipeline{
+		Settings: settings, Extractor: fakeExtractor{extraction}, Catalog: catalog,
+		LLM: llm.NewClient(settings.LLMAPIKey), Piper: fakeEngine{name: "piper"},
+	}
+	pdfPath := filepath.Join(settings.UploadsDir(), "job-llm", "source.pdf")
+	if err := os.MkdirAll(filepath.Dir(pdfPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pdfPath, []byte("%PDF-1.4"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(settings.OutputsDir(), "job-llm")
+	options := domain.DefaultProcessingOptions()
+	options.JobID = "job-llm"
+	options.Filename = "paper.pdf"
+	options.CreatedAt = "2026-04-16T12:00:00Z"
+	options.UseLLMCleaner = true
+	options.LLMBaseURL = server.URL
+	options.LLMAPIKey = "job-key"
+
+	if _, err := pipeline.Process(context.Background(), pdfPath, output, options, nil); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := os.ReadFile(filepath.Join(output, "metadata.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(metadata), "job-key") || strings.Contains(string(metadata), "settings-key") || strings.Contains(string(metadata), "llm_api_key") {
+		t.Fatalf("LLM API key leaked into metadata: %s", metadata)
 	}
 }
 

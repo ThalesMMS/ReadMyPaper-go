@@ -75,6 +75,7 @@ type ProcessingOptions struct {
 	UseLLMCleaner          bool    `json:"use_llm_cleaner"`
 	LLMBaseURL             string  `json:"llm_base_url,omitempty"`
 	LLMModel               string  `json:"llm_model,omitempty"`
+	LLMAPIKey              string  `json:"-"`
 	JobID                  string  `json:"job_id"`
 	Filename               string  `json:"filename"`
 	CreatedAt              string  `json:"created_at"`

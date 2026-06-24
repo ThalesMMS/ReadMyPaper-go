@@ -10,6 +10,7 @@ import (
 )
 
 const AppName = "ReadMyPaper"
+const pythonEnvName = "READMYPAPER_PYTHON_BIN"
 
 // Settings centralizes operational limits and filesystem locations. Values can
 // be overridden with the same READMYPAPER_* environment variables as the
@@ -55,7 +56,7 @@ func Load() (Settings, error) {
 		LLMModel:          strings.TrimSpace(os.Getenv("READMYPAPER_LLM_MODEL")),
 		LLMEnabled:        envBool("READMYPAPER_LLM_ENABLED", false),
 		LLMAPIKey:         envString("READMYPAPER_LLM_API_KEY", "apikey"),
-		PythonBinary:      strings.TrimSpace(os.Getenv("READMYPAPER_PYTHON_BIN")),
+		PythonBinary:      ResolvePythonBinary(),
 	}
 	if s.MaxWorkers < 1 {
 		s.MaxWorkers = 1
@@ -85,6 +86,59 @@ func (s Settings) UploadsDir() string { return filepath.Join(s.DataDir, "uploads
 func (s Settings) OutputsDir() string { return filepath.Join(s.DataDir, "outputs") }
 func (s Settings) VoicesDir() string  { return filepath.Join(s.CacheDir, "voices") }
 func (s Settings) ModelsDir() string  { return filepath.Join(s.CacheDir, "models") }
+
+func ResolvePythonBinary() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return strings.TrimSpace(os.Getenv(pythonEnvName))
+	}
+	return resolvePythonBinaryForExecutable(executable, os.Getenv)
+}
+
+func resolvePythonBinaryForExecutable(executable string, getenv func(string) string) string {
+	if configured := strings.TrimSpace(getenv(pythonEnvName)); configured != "" {
+		return configured
+	}
+	if bundled, ok := bundledPythonForExecutable(executable); ok {
+		return bundled
+	}
+	return ""
+}
+
+func bundledPythonForExecutable(executable string) (string, bool) {
+	executable = filepath.Clean(executable)
+	macOSDir := filepath.Dir(executable)
+	if filepath.Base(macOSDir) != "MacOS" {
+		return "", false
+	}
+	contentsDir := filepath.Dir(macOSDir)
+	if filepath.Base(contentsDir) != "Contents" {
+		return "", false
+	}
+	appDir := filepath.Dir(contentsDir)
+	if !strings.HasSuffix(filepath.Base(appDir), ".app") {
+		return "", false
+	}
+	for _, resourceDir := range bundledPythonResourceDirs() {
+		python := filepath.Join(contentsDir, "Resources", resourceDir, "bin", "python3")
+		info, err := os.Stat(python)
+		if err == nil && !info.IsDir() {
+			return python, true
+		}
+	}
+	return "", false
+}
+
+func bundledPythonResourceDirs() []string {
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x86_64"
+	}
+	if arch == "" {
+		return []string{"python"}
+	}
+	return []string{"python", "python-" + arch}
+}
 
 func (s Settings) EnsureDirs() error {
 	for _, dir := range []string{
