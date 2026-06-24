@@ -1,0 +1,14 @@
+[Details]
+  Name = "ReadMyPaper"
+  ID = "io.github.thalesmms.readmypaper"
+  Version = "0.2.0"
+  Build = 1
+  Icon = "assets/Icon.png"
+
+[LinuxAndBSD]
+  GenericName = "Scientific PDF reader"
+  Categories = ["Education", "AudioVideo"]
+  Comment = "Convert scientific PDFs into cleaned text and spoken audio"
+
+[Migrations]
+  fyneDo = true

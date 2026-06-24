@@ -1,0 +1,6 @@
+# Runtime TTS used by the embedded Python bridges.
+# Python 3.12 is recommended for the widest compatibility.
+piper-tts>=1.4.2,<2.0
+kokoro>=0.7,<2.0
+numpy>=1.26,<3.0
+soundfile>=0.13,<1.0
