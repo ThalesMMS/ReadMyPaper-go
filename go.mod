@@ -1,10 +1,10 @@
 module github.com/ThalesMMS/ReadMyPaper-go
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
-	golang.org/x/text v0.22.0
+	golang.org/x/text v0.37.0
 )
 
 require (
@@ -42,7 +42,7 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
-	golang.org/x/image v0.24.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/image v0.41.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 )
