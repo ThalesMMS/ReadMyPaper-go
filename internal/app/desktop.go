@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"image/color"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
@@ -68,10 +70,10 @@ type Desktop struct {
 
 	voiceDisplayToKey map[string]string
 
-	detailTitle    *widget.Label
-	detailID       *widget.Label
-	detailStatus   *widget.Label
-	detailStep     *widget.Label
+	detailTitle       *widget.Label
+	detailID          *widget.Label
+	detailStatusBadge *statusBadge
+	detailStep        *widget.Label
 	detailPercent  *widget.Label
 	detailProgress *widget.ProgressBar
 	detailError    *widget.Label
@@ -107,12 +109,22 @@ func (d *Desktop) build() {
 	d.tabs = container.NewAppTabs(d.newJobTab, d.jobsTab)
 	d.tabs.SetTabLocation(container.TabLocationTop)
 
-	headerTitle := widget.NewLabelWithStyle("ReadMyPaper", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	headerTitle.TextStyle = fyne.TextStyle{Bold: true}
-	headerSubtitle := widget.NewLabel("Local PDF → cleaned scientific text → spoken reading")
-	header := container.NewVBox(headerTitle, headerSubtitle)
+	headerIcon := canvas.NewImageFromResource(d.application.Icon())
+	headerIcon.FillMode = canvas.ImageFillContain
+	headerIcon.SetMinSize(fyne.NewSize(44, 44))
 
-	d.window.SetContent(container.NewBorder(container.NewPadded(header), nil, nil, nil, d.tabs))
+	headerTitle := widget.NewLabelWithStyle("ReadMyPaper", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	headerTitle.SizeName = theme.SizeNameHeadingText
+	headerSubtitle := widget.NewLabel("Local PDF → cleaned scientific text → spoken reading")
+	headerSubtitle.Importance = widget.LowImportance
+	headerText := container.NewVBox(headerTitle, headerSubtitle)
+	headerRow := container.NewBorder(nil, nil, headerIcon, nil, headerText)
+
+	headerBackground := canvas.NewRectangle(withAlpha(theme.Color(theme.ColorNamePrimary), 22))
+	headerBackground.CornerRadius = 14
+	header := container.NewPadded(container.NewStack(headerBackground, container.NewPadded(headerRow)))
+
+	d.window.SetContent(container.NewBorder(header, nil, nil, nil, d.tabs))
 	d.window.Resize(fyne.NewSize(1080, 820))
 	d.window.CenterOnScreen()
 	d.window.SetCloseIntercept(func() {
@@ -132,11 +144,10 @@ func (d *Desktop) build() {
 }
 
 func (d *Desktop) buildNewJobView() fyne.CanvasObject {
-	intro := widget.NewCard(
-		"ReadMyPaper",
-		"Private, local conversion of scientific papers to spoken audio",
+	intro := widget.NewCard("", "", container.NewVBox(
+		cardHeader(theme.InfoIcon(), "ReadMyPaper", "Private, local conversion of scientific papers to spoken audio"),
 		wrapLabel("Choose a scientific PDF. The app repairs common multi-column reading order, removes layout noise and end matter, then generates a WAV reading in English or Brazilian Portuguese. Voice models are downloaded only when first used."),
-	)
+	))
 
 	d.fileLabel = wrapLabel(noPDFSelected)
 	chooseFile := widget.NewButtonWithIcon("Choose PDF", theme.FolderOpenIcon(), d.choosePDF)
@@ -198,24 +209,27 @@ func (d *Desktop) buildNewJobView() fyne.CanvasObject {
 	if !d.settings.LLMEnabled {
 		d.llmFields.Hide()
 	}
-	cleanup := widget.NewCard("Cleanup rules", "", container.NewVBox(
-		d.removeCites, d.dropRefs, d.dropAcks, d.dropApps, d.keepHeads, d.useLLM, d.llmFields,
+	checkGrid := container.NewGridWithColumns(2, d.removeCites, d.dropRefs, d.dropAcks, d.dropApps, d.keepHeads)
+	cleanup := widget.NewCard("", "", container.NewVBox(
+		cardHeader(theme.SettingsIcon(), "Cleanup rules", ""),
+		checkGrid, widget.NewSeparator(), d.useLLM, d.llmFields,
 	))
 
 	d.process = widget.NewButtonWithIcon("Process PDF", theme.MediaPlayIcon(), d.submitJob)
 	d.process.Importance = widget.HighImportance
 	d.formStatus = wrapLabel("")
-	form := widget.NewCard("New job", "", container.NewVBox(
+	form := widget.NewCard("", "", container.NewVBox(
+		cardHeader(theme.DocumentCreateIcon(), "New job", ""),
 		field("PDF", fileRow), fields, cleanup, d.formStatus, d.process,
 	))
 
-	how := widget.NewCard("How it works", "", wrapLabel(
+	how := widget.NewCard("", "", container.NewVBox(cardHeader(theme.HelpIcon(), "How it works", ""), wrapLabel(
 		"1. Text and coordinates are extracted locally from the PDF.\n"+
 			"2. Multi-column reading order is repaired page by page.\n"+
 			"3. Spatial and deterministic rules remove figures, tables, citations and end matter.\n"+
 			"4. Scientific notation is expanded for natural listening.\n"+
 			"5. Piper (fast) or Kokoro (quality) synthesizes a local WAV file.",
-	))
+	)))
 	content := container.NewVBox(intro, form, how)
 	return container.NewVScroll(container.NewPadded(content))
 }
@@ -228,9 +242,7 @@ func (d *Desktop) buildJobsView() fyne.CanvasObject {
 			return len(d.jobs)
 		},
 		func() fyne.CanvasObject {
-			title := widget.NewLabelWithStyle("document.pdf", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-			status := widget.NewLabel("Queued")
-			return container.NewBorder(nil, nil, nil, status, title)
+			return newJobRow()
 		},
 		func(id widget.ListItemID, object fyne.CanvasObject) {
 			d.jobsMu.RLock()
@@ -239,11 +251,9 @@ func (d *Desktop) buildJobsView() fyne.CanvasObject {
 				return
 			}
 			job := d.jobs[id]
-			row := object.(*fyne.Container)
-			title := row.Objects[0].(*widget.Label)
-			status := row.Objects[1].(*widget.Label)
-			title.SetText(job.Filename)
-			status.SetText(statusText(job))
+			row := object.(*jobRow)
+			row.title.SetText(job.Filename)
+			row.badge.SetStatus(statusText(job), statusImportance(job))
 		},
 	)
 	d.jobList.OnSelected = func(id widget.ListItemID) {
@@ -257,8 +267,7 @@ func (d *Desktop) buildJobsView() fyne.CanvasObject {
 
 	d.detailTitle = widget.NewLabelWithStyle("Select a job", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	d.detailID = wrapLabel("")
-	d.detailStatus = widget.NewLabel("")
-	d.detailStatus.Alignment = fyne.TextAlignTrailing
+	d.detailStatusBadge = newStatusBadge()
 	d.detailStep = widget.NewLabel("")
 	d.detailPercent = widget.NewLabel("0%")
 	d.detailPercent.Alignment = fyne.TextAlignTrailing
@@ -281,16 +290,26 @@ func (d *Desktop) buildJobsView() fyne.CanvasObject {
 	progressHeader := container.NewBorder(nil, nil, d.detailStep, d.detailPercent)
 	actions := container.NewHBox(d.saveAudio, d.saveText, d.savePDF, d.deleteJob)
 	audioActions := container.NewHBox(d.playButton, d.stopButton)
+	titleRow := container.NewBorder(nil, nil, container.NewHBox(widget.NewIcon(theme.DocumentIcon()), d.detailTitle), d.detailStatusBadge.canvasObject())
 	jobCard := widget.NewCard("", "", container.NewVBox(
-		container.NewBorder(nil, nil, d.detailTitle, d.detailStatus),
-		d.detailID, progressHeader, d.detailProgress, d.detailError, actions,
+		titleRow, d.detailID, progressHeader, d.detailProgress, d.detailError, actions,
 	))
-	audioCard := widget.NewCard("Audio", "Playback uses the operating system's local WAV player.", audioActions)
-	previewCard := widget.NewCard("Cleaned text preview", "", d.preview)
-	statsCard := widget.NewCard("Processing statistics", "", d.statsLabel)
+	audioCard := widget.NewCard("", "", container.NewVBox(
+		cardHeader(theme.MediaMusicIcon(), "Audio", "Playback uses the operating system's local WAV player."),
+		audioActions,
+	))
+	previewCard := widget.NewCard("", "", container.NewVBox(
+		cardHeader(theme.FileTextIcon(), "Cleaned text preview", ""), d.preview,
+	))
+	statsCard := widget.NewCard("", "", container.NewVBox(
+		cardHeader(theme.InfoIcon(), "Processing statistics", ""), d.statsLabel,
+	))
 	detail := container.NewVScroll(container.NewPadded(container.NewVBox(jobCard, audioCard, previewCard, statsCard)))
 
-	listCard := widget.NewCard("Jobs", "Saved jobs are restored on startup.", d.jobList)
+	listCard := widget.NewCard("", "", container.NewBorder(
+		cardHeader(theme.ListIcon(), "Jobs", "Saved jobs are restored on startup."), nil, nil, nil,
+		d.jobList,
+	))
 	listCard.Resize(fyne.NewSize(320, 600))
 	split := container.NewHSplit(container.NewPadded(listCard), detail)
 	split.Offset = 0.31
@@ -499,7 +518,7 @@ func (d *Desktop) refreshDetail() {
 	if !exists {
 		d.detailTitle.SetText("Select a job")
 		d.detailID.SetText("")
-		d.detailStatus.SetText("")
+		d.detailStatusBadge.SetStatus("", widget.MediumImportance)
 		d.detailStep.SetText("")
 		d.detailPercent.SetText("0%")
 		d.detailProgress.SetValue(0)
@@ -511,7 +530,7 @@ func (d *Desktop) refreshDetail() {
 	}
 	d.detailTitle.SetText(job.Filename)
 	d.detailID.SetText("Job ID: " + job.JobID)
-	d.detailStatus.SetText(statusText(job))
+	d.detailStatusBadge.SetStatus(statusText(job), statusImportance(job))
 	d.detailStep.SetText(job.Step)
 	d.detailPercent.SetText(fmt.Sprintf("%.0f%%", job.Progress*100))
 	d.detailProgress.SetValue(job.Progress)
@@ -649,6 +668,80 @@ func wrapLabel(text string) *widget.Label {
 	return label
 }
 
+// cardHeader builds an icon + bold title (and optional dimmed subtitle) row
+// followed by a separator, used in place of widget.Card's plain text title
+// so section cards read as distinct, styled blocks.
+func cardHeader(icon fyne.Resource, title, subtitle string) fyne.CanvasObject {
+	titleLabel := widget.NewLabelWithStyle(title, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	titleLabel.SizeName = theme.SizeNameSubHeadingText
+	row := container.NewHBox(widget.NewIcon(icon), titleLabel)
+	if subtitle == "" {
+		return container.NewVBox(row, widget.NewSeparator())
+	}
+	subtitleLabel := wrapLabel(subtitle)
+	subtitleLabel.Importance = widget.LowImportance
+	return container.NewVBox(row, subtitleLabel, widget.NewSeparator())
+}
+
+// statusBadge is a small rounded, tinted chip used to show job status with a
+// color that matches its importance (success/warning/danger/neutral).
+type statusBadge struct {
+	root  *fyne.Container
+	bg    *canvas.Rectangle
+	label *widget.Label
+}
+
+func newStatusBadge() *statusBadge {
+	label := widget.NewLabelWithStyle("", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	bg := canvas.NewRectangle(color.Transparent)
+	bg.CornerRadius = 8
+	root := container.NewStack(bg, container.NewPadded(label))
+	return &statusBadge{root: root, bg: bg, label: label}
+}
+
+func (b *statusBadge) canvasObject() fyne.CanvasObject { return b.root }
+
+func (b *statusBadge) SetStatus(text string, importance widget.Importance) {
+	b.label.Importance = importance
+	b.label.SetText(text)
+	b.bg.FillColor = badgeTint(importance)
+	b.bg.Refresh()
+}
+
+func badgeTint(importance widget.Importance) color.Color {
+	var name fyne.ThemeColorName
+	switch importance {
+	case widget.SuccessImportance:
+		name = theme.ColorNameSuccess
+	case widget.DangerImportance:
+		name = theme.ColorNameError
+	case widget.WarningImportance:
+		name = theme.ColorNameWarning
+	case widget.HighImportance:
+		name = theme.ColorNamePrimary
+	default:
+		name = theme.ColorNameForeground
+	}
+	return withAlpha(theme.Color(name), 40)
+}
+
+// jobRow is a Jobs-list row: a bold filename with a colored status chip
+// trailing it. Kept as a typed widget so the list's update callback can
+// reach the title/badge directly instead of re-deriving them from a
+// generic container's child slice.
+type jobRow struct {
+	*fyne.Container
+	title *widget.Label
+	badge *statusBadge
+}
+
+func newJobRow() *jobRow {
+	title := widget.NewLabelWithStyle("document.pdf", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	badge := newStatusBadge()
+	row := container.NewBorder(nil, nil, nil, badge.canvasObject(), title)
+	return &jobRow{Container: row, title: title, badge: badge}
+}
+
 func selectedLanguage(display string) string {
 	switch display {
 	case "English":
@@ -677,6 +770,19 @@ func statusText(job domain.JobState) string {
 		return fmt.Sprintf("Running · %.0f%%", job.Progress*100)
 	default:
 		return "Queued"
+	}
+}
+
+func statusImportance(job domain.JobState) widget.Importance {
+	switch job.Status {
+	case domain.JobCompleted:
+		return widget.SuccessImportance
+	case domain.JobFailed:
+		return widget.DangerImportance
+	case domain.JobRunning:
+		return widget.WarningImportance
+	default:
+		return widget.MediumImportance
 	}
 }
 

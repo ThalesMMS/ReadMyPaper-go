@@ -49,6 +49,7 @@ func main() {
 	manager := jobs.NewManager(store, processor, settings.MaxWorkers)
 	application := fyneapp.NewWithID("io.github.thalesmms.readmypaper")
 	application.SetIcon(fyne.NewStaticResource("Icon.png", iconBytes))
+	application.Settings().SetTheme(desktopapp.NewTheme())
 	desktop := desktopapp.NewDesktop(application, settings, store, manager, processor.Catalog)
 	desktop.Window().ShowAndRun()
 }
